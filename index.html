@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Minha Agenda</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: mês à esquerda como mapa, dia aberto à direita como caderno; no celular empilha.
+   Identidade E3 Company (tokens do site e3digitalagencia.com): tema escuro único, laranja da marca, amarelo de ação. */
+:root {
+  color-scheme: dark;
+  --bg: #0D0900;
+  --surface: #121110;
+  --well: #1a1817;
+  --ink: #ECECEC;
+  --muted: #999999;
+  --line: #2e2c2c;
+  --accent: #FF612A;
+  --accent-soft: rgba(255, 95, 31, 0.14);
+  --action: #ffec00;
+  --action-hover: #e0ce00;
+  --on-action: #020202;
+  --today: #ffec00;
+  --danger: #ff7a5c;
+  --grad: linear-gradient(90deg, #FF4200 0%, #FF612A 55%, #FFF3EE 100%);
+  --grad-rule: linear-gradient(90deg, rgba(255,66,0,0) 0%, #FF612A 43%, rgba(255,66,0,0) 100%);
+  --t-work: #6aa6e6; --t-client: #FF612A; --t-personal: #d58ccd; --t-other: #7a838e;
+  --f-display: "Archivo", system-ui, sans-serif;
+  --f-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --r: 14px;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; position: relative; }
+header.top::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--grad-rule); }
+.brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.brand img { height: 26px; width: auto; display: block; }
+.brand h1 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 0; letter-spacing: -0.01em; padding-left: 14px; border-left: 1px solid var(--line); }
+.brand h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.status { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.status.ok::before { background: var(--accent); }
+.status.warn::before { background: var(--today); }
+
+.btn { border: 1px solid var(--line); background: var(--well); border-radius: 50px; padding: 7px 16px; font-weight: 600; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--action); border-color: var(--action); color: var(--on-action); font-weight: 700; }
+.btn.primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.small { padding: 4px 9px; font-size: 12.5px; }
+.btn.danger { color: var(--danger); }
+
+.alert { display: none; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; }
+.alert.on { display: flex; }
+.alert strong { font-family: var(--f-display); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 20px; min-width: 0; }
+@media (max-width: 520px) { .panel { padding: 14px; border-radius: 18px; } }
+.day, .up, input, textarea, select { background: var(--well) !important; }
+.day.sel { background: var(--accent-soft) !important; }
+.chip { background: var(--surface) !important; }
+.integr .card { border-radius: 18px !important; }
+
+.monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.monthbar h2 { font-family: var(--f-display); font-weight: 600; font-size: 20px; margin: 0; text-transform: capitalize; }
+.monthbar .nav { display: flex; gap: 4px; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.dow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: center; padding-bottom: 4px; }
+.day { border: 1px solid transparent; background: var(--bg); border-radius: 8px; min-height: 78px; padding: 6px; text-align: left; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
+.day:hover { border-color: var(--line); }
+.day.out { opacity: 0.4; }
+.day.sel { border-color: var(--accent); background: var(--accent-soft); }
+.day .n { font-family: var(--f-mono); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+.day.today .n span:first-child { background: var(--today); color: #1b1408; border-radius: 5px; padding: 0 5px; }
+.day .noteDot { width: 6px; height: 6px; border-radius: 2px; background: var(--muted); }
+.chip { font-size: 11px; line-height: 1.3; padding: 1px 5px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--tc, var(--accent)); background: var(--surface); }
+.more { font-size: 11px; color: var(--muted); }
+@media (max-width: 520px) { .day { min-height: 54px; padding: 4px; } .chip { display: none; } .day .dots { display: flex; gap: 3px; flex-wrap: wrap; } }
+.dots { display: none; } .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--tc, var(--accent)); }
+
+.upcoming { margin-top: 16px; }
+.upcoming h3, .dayhead h3, .sec h3 { font-family: var(--f-display); font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.uplist { display: flex; flex-direction: column; gap: 6px; }
+.up { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 0; text-align: left; border-left: 3px solid var(--tc, var(--accent)); }
+.up .when { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.up .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.up .rel { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+
+.dayhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.dayhead h2 { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 0; text-wrap: balance; }
+.dayhead .sub { color: var(--muted); font-size: 13px; text-transform: capitalize; }
+
+.mlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.meet { border: 1px solid var(--line); border-left: 4px solid var(--tc, var(--accent)); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.meet .row1 { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+.meet .time { font-family: var(--f-mono); font-size: 13px; color: var(--accent); }
+.meet .title { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.meet .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.meet .meta a { color: var(--accent); }
+.meet .mnotes { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; }
+.meet .acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.meet.past { opacity: 0.65; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tc); }
+
+form.mform { display: none; flex-direction: column; gap: 10px; border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+form.mform.on { display: flex; }
+.frow { display: flex; gap: 8px; flex-wrap: wrap; }
+.frow > label { flex: 1 1 120px; min-width: 0; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+input, textarea, select { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; width: 100%; font-size: 14px; }
+textarea { resize: vertical; min-height: 64px; }
+.daynotes textarea { min-height: 170px; line-height: 1.6; }
+.saved { font-size: 12px; color: var(--muted); min-height: 18px; }
+
+.sec { margin-top: 18px; }
+.integr { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.integr .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.integr .card b { display: block; font-family: var(--f-display); font-weight: 600; margin-bottom: 2px; }
+.integr .card p { margin: 0; color: var(--muted); font-size: 13px; }
+.foot { margin-top: 22px; color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <img src="data:image/webp;base64,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" alt="E3 Company" width="133" height="26">
+      <h1>Minha <span>Agenda</span></h1>
+      <span id="status" class="status">Conectando…</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" id="goToday" type="button">Hoje</button>
+      <button class="btn" id="exportMonth" type="button" title="Baixa um arquivo .ics com as reuniões do mês, com lembrete">Exportar mês (.ics)</button>
+    </div>
+  </header>
+
+  <div class="alert" id="alert" role="status" aria-live="polite"></div>
+
+  <div class="grid">
+    <section class="panel" aria-label="Calendário do mês">
+      <div class="monthbar">
+        <h2 id="monthTitle"></h2>
+        <div class="nav">
+          <button class="btn small" id="prevM" type="button" aria-label="Mês anterior">‹</button>
+          <button class="btn small" id="nextM" type="button" aria-label="Próximo mês">›</button>
+        </div>
+      </div>
+      <div class="cal" id="cal"></div>
+
+      <div class="upcoming">
+        <h3>Próximas reuniões</h3>
+        <div class="uplist" id="uplist"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Dia selecionado">
+      <div class="dayhead">
+        <div>
+          <h2 id="dayTitle"></h2>
+          <div class="sub" id="daySub"></div>
+        </div>
+        <button class="btn primary" id="addBtn" type="button">+ Reunião</button>
+      </div>
+
+      <form class="mform" id="mform" autocomplete="off">
+        <label>Título<input id="fTitle" required maxlength="140" placeholder="Ex.: Alinhamento com cliente"></label>
+        <div class="frow">
+          <label>Início<input id="fStart" type="time" required></label>
+          <label>Fim<input id="fEnd" type="time"></label>
+          <label>Categoria
+            <select id="fTag">
+              <option value="work">Trabalho</option>
+              <option value="client">Cliente</option>
+              <option value="personal">Pessoal</option>
+              <option value="other">Outro</option>
+            </select>
+          </label>
+        </div>
+        <div class="frow">
+          <label>Link da chamada<input id="fLink" type="url" placeholder="https://meet.google.com/…"></label>
+          <label>Local / com quem<input id="fPlace" maxlength="140" placeholder="Sala 3, João e Maria"></label>
+        </div>
+        <label>Anotações da reunião<textarea id="fNotes" placeholder="Pauta, decisões, próximos passos…"></textarea></label>
+        <div class="frow" style="justify-content:flex-end">
+          <button class="btn ghost" type="button" id="cancelBtn">Cancelar</button>
+          <button class="btn primary" type="submit" id="saveBtn">Salvar reunião</button>
+        </div>
+      </form>
+
+      <div class="mlist" id="mlist"></div>
+
+      <div class="daynotes">
+        <h3 style="font-family:var(--f-display);font-size:15px;margin:0 0 8px">Anotações do dia</h3>
+        <textarea id="dayNotes" placeholder="Escreva livremente: ideias, pendências, o que aconteceu hoje…"></textarea>
+        <div class="saved" id="savedMsg"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="sec">
+    <h3>Para não esquecer</h3>
+    <div class="integr">
+      <div class="card"><b>Lembrete na tela</b><p>Com a agenda aberta, um aviso aparece no topo 15 minutos antes de cada reunião.</p></div>
+      <div class="card"><b>Celular e Outlook (.ics)</b><p>Em cada reunião, “Lembrete .ics” baixa um evento com alarme de 15 min. Abra no celular para cair no calendário nativo.</p></div>
+      <div class="card"><b>Google Agenda só como alarme</b><p>“Enviar ao Google” cria o evento lá apenas para o Google notificar você. Aqui continua sendo seu lugar de organização.</p></div>
+    </div>
+  </section>
+
+  <p class="foot" id="foot">Suas reuniões e anotações ficam privadas na sua conta. Ninguém com quem você compartilhar esta página vê seus dados.</p>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, "0");
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const TAGS = { work: "Trabalho", client: "Cliente", personal: "Pessoal", other: "Outro" };
+  const tagColor = (t) => `var(--t-${TAGS[t] ? t : "other"})`;
+  const MONTHS = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const DOW = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  const fmtLong = (d) => d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  let days = {};            // "YYYY-MM-DD" -> { meetings: [], notes: "" }
+  let selected = keyOf(new Date());
+  let view = new Date(); view.setDate(1);
+  let editingId = null;
+  let mode = "loading";     // "db" | "local"
+  let col = null, downloads = null;
+
+  const getDay = (k) => days[k] || { meetings: [], notes: "" };
+  const sortM = (arr) => arr.slice().sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+
+  // ---------- armazenamento ----------
+  const LS = "minha-agenda-v1";
+  const lsLoad = () => { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch { return {}; } };
+  const lsSave = () => { try { localStorage.setItem(LS, JSON.stringify(days)); } catch {} };
+
+  const chains = {};
+  function persist(k) {
+    if (mode === "local") { lsSave(); return Promise.resolve(); }
+    if (mode !== "db") return Promise.resolve();
+    const snapshot = JSON.parse(JSON.stringify(getDay(k)));
+    const empty = !snapshot.meetings.length && !snapshot.notes.trim();
+    const run = () => {
+      const ref = col.doc("d-" + k);
+      return (empty ? ref.delete() : ref.set({ date: k, ...snapshot })).catch((e) => {
+        setStatus(e && e.code === "quota_exceeded" ? "Espaço cheio: apague dias antigos" : "Não foi possível salvar agora", "warn");
+        throw e;
+      });
+    };
+    chains[k] = (chains[k] || Promise.resolve()).catch(() => {}).then(run);
+    return chains[k];
+  }
+
+  function setStatus(text, cls) { const s = $("status"); s.textContent = text; s.className = "status " + (cls || ""); }
+
+  async function initStore() {
+    let db = null, user = null;
+    try { [db, user] = await Promise.all([window.claude?.use?.("db"), window.claude?.use?.("user")]); } catch {}
+    const uid = user ? await user.id().catch(() => null) : null;
+    if (!db || !uid) {
+      mode = "local"; days = lsLoad();
+      setStatus("Salvo só neste navegador", "warn");
+      $("foot").textContent = window.claude
+        ? "Abra a agenda logado no claude.ai para salvar na sua conta e acessar de qualquer aparelho."
+        : "Suas reuniões e anotações ficam salvas só neste navegador, neste aparelho. Nada é enviado para servidor nenhum.";
+      renderAll(); return;
+    }
+    col = db.collection("data/users/" + uid);
+    const timer = setTimeout(() => setStatus("Sem conexão ainda, tentando…", "warn"), 10000);
+    col.onSnapshot((snap) => {
+      const next = {};
+      snap.docs.forEach((d) => { const v = d.data(); if (v && v.date) next[v.date] = { meetings: Array.isArray(v.meetings) ? v.meetings : [], notes: v.notes || "" }; });
+      const typingKey = document.activeElement === $("dayNotes") ? selected : null;
+      if (typingKey && days[typingKey]) next[typingKey] = { ...(next[typingKey] || { meetings: [] }), notes: days[typingKey].notes };
+      days = next;
+      if (!snap.metadata.fromCache) { clearTimeout(timer); setStatus("Salvo na sua conta", "ok"); }
+      mode = "db"; renderAll();
+    }, (e) => { clearTimeout(timer); setStatus("Conexão perdida. Recarregue a página", "warn"); });
+    mode = "db";
+  }
+
+  // ---------- render ----------
+  function renderCalendar() {
+    $("monthTitle").textContent = `${MONTHS[view.getMonth()]} ${view.getFullYear()}`;
+    const cal = $("cal"); cal.innerHTML = "";
+    DOW.forEach((d) => { const e = document.createElement("div"); e.className = "dow"; e.textContent = d; cal.appendChild(e); });
+    const start = new Date(view); start.setDate(1 - view.getDay());
+    const todayK = keyOf(new Date());
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const k = keyOf(d), info = getDay(k), ms = sortM(info.meetings);
+      if (i >= 35 && d.getMonth() !== view.getMonth()) break;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "day" + (d.getMonth() !== view.getMonth() ? " out" : "") + (k === selected ? " sel" : "") + (k === todayK ? " today" : "");
+      b.setAttribute("aria-label", `${fmtLong(d)}: ${ms.length} reunião(ões)${info.notes.trim() ? ", com anotações" : ""}`);
+      const n = document.createElement("div"); n.className = "n";
+      n.innerHTML = `<span>${d.getDate()}</span>${info.notes.trim() ? '<i class="noteDot" title="Tem anotações"></i>' : ""}`;
+      b.appendChild(n);
+      ms.slice(0, 2).forEach((m) => { const c = document.createElement("div"); c.className = "chip"; c.style.setProperty("--tc", tagColor(m.tag)); c.textContent = `${m.start} ${m.title}`; b.appendChild(c); });
+      if (ms.length > 2) { const mo = document.createElement("div"); mo.className = "more"; mo.textContent = `+${ms.length - 2}`; b.appendChild(mo); }
+      if (ms.length) { const dots = document.createElement("div"); dots.className = "dots"; ms.slice(0, 4).forEach((m) => { const i2 = document.createElement("i"); i2.style.setProperty("--tc", tagColor(m.tag)); dots.appendChild(i2); }); b.appendChild(dots); }
+      b.addEventListener("click", () => selectDay(k));
+      cal.appendChild(b);
+    }
+  }
+
+  const meetDate = (k, t) => { const d = parseKey(k); const [h, m] = (t || "00:00").split(":").map(Number); d.setHours(h, m, 0, 0); return d; };
+  function relTime(ms) {
+    const min = Math.round(ms / 60000);
+    if (min < 1) return "agora";
+    if (min < 60) return `em ${min} min`;
+    const h = Math.round(min / 60); if (h < 24) return `em ${h} h`;
+    const dd = Math.round(h / 24); return dd === 1 ? "amanhã" : `em ${dd} dias`;
+  }
+  function allUpcoming() {
+    const now = Date.now(), out = [];
+    Object.keys(days).forEach((k) => getDay(k).meetings.forEach((m) => { const t = meetDate(k, m.start).getTime(); if (t >= now - 5 * 60000) out.push({ k, m, t }); }));
+    return out.sort((a, b) => a.t - b.t);
+  }
+  function renderUpcoming() {
+    const list = $("uplist"); list.innerHTML = "";
+    const ups = allUpcoming().slice(0, 5);
+    if (!ups.length) { list.innerHTML = '<div class="empty">Nenhuma reunião marcada daqui pra frente. Escolha um dia e clique em “+ Reunião”.</div>'; return; }
+    ups.forEach(({ k, m, t }) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.style.setProperty("--tc", tagColor(m.tag));
+      const d = parseKey(k);
+      b.innerHTML = `<span class="when"></span><span class="t"></span><span class="rel"></span>`;
+      b.querySelector(".when").textContent = `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${m.start}`;
+      b.querySelector(".t").textContent = m.title;
+      b.querySelector(".rel").textContent = relTime(t - Date.now());
+      b.addEventListener("click", () => selectDay(k));
+      list.appendChild(b);
+    });
+  }
+
+  function renderDay() {
+    const d = parseKey(selected), info = getDay(selected);
+    const todayK = keyOf(new Date());
+    const tom = new Date(); tom.setDate(tom.getDate() + 1);
+    $("dayTitle").textContent = selected === todayK ? "Hoje" : selected === keyOf(tom) ? "Amanhã" : `${d.getDate()} de ${MONTHS[d.getMonth()]}`;
+    $("daySub").textContent = fmtLong(d);
+    const list = $("mlist"); list.innerHTML = "";
+    const ms = sortM(info.meetings);
+    if (!ms.length) list.innerHTML = '<div class="empty">Sem reuniões neste dia.</div>';
+    ms.forEach((m) => {
+      const el = document.createElement("article");
+      const past = meetDate(selected, m.end || m.start).getTime() < Date.now();
+      el.className = "meet" + (past ? " past" : ""); el.style.setProperty("--tc", tagColor(m.tag));
+      el.innerHTML = `<div class="row1"><span class="time"></span><span class="tag"></span></div><div class="title"></div><div class="meta"></div><div class="mnotes"></div>
+        <div class="acts">
+          <button class="btn small" data-a="edit" type="button">Editar</button>
+          <button class="btn small" data-a="ics" type="button">Lembrete .ics</button>
+          <a class="btn small" data-a="gcal" target="_blank" rel="noopener" style="text-decoration:none">Enviar ao Google</a>
+          <button class="btn small danger" data-a="del" type="button">Excluir</button>
+        </div>`;
+      el.querySelector(".time").textContent = m.end ? `${m.start} – ${m.end}` : m.start;
+      el.querySelector(".tag").textContent = TAGS[m.tag] || "Outro";
+      el.querySelector(".title").textContent = m.title;
+      const meta = el.querySelector(".meta");
+      if (m.place) meta.append(m.place);
+      if (m.link) { if (m.place) meta.append(" · "); const a = document.createElement("a"); a.href = m.link; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Entrar na chamada"; meta.append(a); }
+      if (!m.place && !m.link) meta.remove();
+      const mn = el.querySelector(".mnotes"); if (m.notes) mn.textContent = m.notes; else mn.remove();
+      el.querySelector('[data-a="gcal"]').href = gcalUrl(selected, m);
+      el.querySelector('[data-a="edit"]').addEventListener("click", () => openForm(m));
+      el.querySelector('[data-a="ics"]').addEventListener("click", () => saveIcs([{ k: selected, m }], `reuniao-${selected}.ics`));
+      const del = el.querySelector('[data-a="del"]');
+      del.addEventListener("click", () => {
+        if (del.dataset.confirm) { removeMeeting(m.id); return; }
+        del.dataset.confirm = "1"; del.textContent = "Confirmar exclusão";
+        setTimeout(() => { if (del.isConnected) { delete del.dataset.confirm; del.textContent = "Excluir"; } }, 4000);
+      });
+      list.appendChild(el);
+    });
+    if (document.activeElement !== $("dayNotes")) $("dayNotes").value = info.notes;
+  }
+
+  function renderAll() { renderCalendar(); renderDay(); renderUpcoming(); checkAlerts(); }
+
+  function selectDay(k) {
+    flushNotes();
+    selected = k; const d = parseKey(k);
+    if (d.getMonth() !== view.getMonth() || d.getFullYear() !== view.getFullYear()) { view = new Date(d); view.setDate(1); }
+    closeForm(); $("savedMsg").textContent = ""; renderAll();
+  }
+
+  // ---------- reuniões ----------
+  function openForm(m) {
+    editingId = m ? m.id : null;
+    $("fTitle").value = m?.title || ""; $("fStart").value = m?.start || "09:00"; $("fEnd").value = m?.end || "";
+    $("fTag").value = m?.tag || "work"; $("fLink").value = m?.link || ""; $("fPlace").value = m?.place || ""; $("fNotes").value = m?.notes || "";
+    $("saveBtn").textContent = m ? "Salvar alterações" : "Salvar reunião";
+    $("mform").classList.add("on"); $("fTitle").focus();
+  }
+  function closeForm() { $("mform").classList.remove("on"); editingId = null; }
+  function removeMeeting(id) {
+    const info = getDay(selected);
+    days[selected] = { ...info, meetings: info.meetings.filter((x) => x.id !== id) };
+    persist(selected); renderAll();
+  }
+  $("addBtn").addEventListener("click", () => openForm(null));
+  $("cancelBtn").addEventListener("click", closeForm);
+  $("mform").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const m = {
+      id: editingId || "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title: $("fTitle").value.trim(), start: $("fStart").value, end: $("fEnd").value,
+      tag: $("fTag").value, link: $("fLink").value.trim(), place: $("fPlace").value.trim(), notes: $("fNotes").value.trim(),
+    };
+    if (!m.title || !m.start) return;
+    if (m.end && m.end <= m.start) { $("fEnd").setCustomValidity("O fim precisa ser depois do início"); $("fEnd").reportValidity(); return; }
+    $("fEnd").setCustomValidity("");
+    const info = getDay(selected);
+    const meetings = editingId ? info.meetings.map((x) => (x.id === editingId ? m : x)) : [...info.meetings, m];
+    days[selected] = { ...info, meetings };
+    persist(selected); closeForm(); renderAll();
+  });
+  $("fEnd").addEventListener("input", () => $("fEnd").setCustomValidity(""));
+
+  // ---------- anotações do dia ----------
+  let noteTimer = null, noteKey = null;
+  function flushNotes() {
+    if (!noteTimer) return;
+    clearTimeout(noteTimer); noteTimer = null;
+    const k = noteKey;
+    persist(k).then(() => { if (k === selected) $("savedMsg").textContent = "Anotações salvas"; }).catch(() => {});
+  }
+  $("dayNotes").addEventListener("input", () => {
+    const info = getDay(selected);
+    days[selected] = { ...info, notes: $("dayNotes").value };
+    noteKey = selected; $("savedMsg").textContent = "Digitando…";
+    clearTimeout(noteTimer); noteTimer = setTimeout(() => { flushNotes(); renderCalendar(); }, 800);
+  });
+  $("dayNotes").addEventListener("blur", () => { flushNotes(); renderCalendar(); });
+
+  // ---------- navegação ----------
+  $("prevM").addEventListener("click", () => { view.setMonth(view.getMonth() - 1); renderCalendar(); });
+  $("nextM").addEventListener("click", () => { view.setMonth(view.getMonth() + 1); renderCalendar(); });
+  $("goToday").addEventListener("click", () => selectDay(keyOf(new Date())));
+
+  // ---------- integrações ----------
+  const icsStamp = (k, t) => k.replace(/-/g, "") + "T" + (t || "00:00").replace(":", "") + "00";
+  const addHour = (t) => { const [h, m] = t.split(":").map(Number); return pad(Math.min(23, h + 1)) + ":" + pad(m); };
+  const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
+  function gcalUrl(k, m) {
+    const p = new URLSearchParams({ action: "TEMPLATE", text: m.title, dates: `${icsStamp(k, m.start)}/${icsStamp(k, m.end || addHour(m.start))}`,
+      details: [m.link, m.notes].filter(Boolean).join("\n\n"), location: m.place || m.link || "" });
+    return "https://calendar.google.com/calendar/render?" + p.toString();
+  }
+  function buildIcs(items) {
+    const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Minha Agenda//PT-BR", "CALSCALE:GREGORIAN"];
+    items.forEach(({ k, m }) => {
+      lines.push("BEGIN:VEVENT", `UID:${m.id}-${k}@minha-agenda`, `DTSTAMP:${now}`,
+        `DTSTART:${icsStamp(k, m.start)}`, `DTEND:${icsStamp(k, m.end || addHour(m.start))}`,
+        `SUMMARY:${esc(m.title)}`);
+      if (m.place) lines.push(`LOCATION:${esc(m.place)}`);
+      if (m.link) lines.push(`URL:${m.link}`);
+      const desc = [m.link, m.notes].filter(Boolean).join("\n\n"); if (desc) lines.push(`DESCRIPTION:${esc(desc)}`);
+      lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(m.title)}`, "TRIGGER:-PT15M", "END:VALARM",
+                 "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(m.title)}`, "TRIGGER:-PT1H", "END:VALARM", "END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+  async function saveIcs(items, filename) {
+    if (!items.length) { showAlert("Nenhuma reunião neste mês para exportar."); return; }
+    try {
+      if (!downloads) downloads = await window.claude?.use?.("downloads");
+      const blob = new Blob([buildIcs(items)], { type: "text/calendar" });
+      if (!downloads) {
+        if (window.claude) { showAlert("Download indisponível aqui. Use “Enviar ao Google” na reunião."); return; }
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        return;
+      }
+      await downloads.save({ filename, data: blob });
+    } catch (e) { if (e && e.code !== "declined" && e.code !== "cancelled") showAlert("O download não foi concluído."); }
+  }
+  $("exportMonth").addEventListener("click", () => {
+    const pre = `${view.getFullYear()}-${pad(view.getMonth() + 1)}`, items = [];
+    Object.keys(days).filter((k) => k.startsWith(pre)).forEach((k) => getDay(k).meetings.forEach((m) => items.push({ k, m })));
+    saveIcs(items, `agenda-${pre}.ics`);
+  });
+
+  // ---------- aviso 15 min antes ----------
+  const dismissed = new Set();
+  function showAlert(text, extra) {
+    const a = $("alert"); a.innerHTML = ""; const s = document.createElement("span"); s.innerHTML = text; a.appendChild(s);
+    if (extra) a.appendChild(extra);
+    const x = document.createElement("button"); x.className = "btn small ghost"; x.type = "button"; x.textContent = "Fechar";
+    x.addEventListener("click", () => { a.classList.remove("on"); if (a.dataset.id) dismissed.add(a.dataset.id); });
+    a.appendChild(x); a.dataset.id = ""; a.classList.add("on");
+  }
+  function checkAlerts() {
+    const now = Date.now();
+    const soon = allUpcoming().find(({ k, m, t }) => t - now <= 15 * 60000 && t - now > -5 * 60000 && !dismissed.has(m.id + k));
+    const a = $("alert");
+    if (!soon) { if (a.dataset.id) a.classList.remove("on"); return; }
+    const id = soon.m.id + soon.k;
+    const t = document.createElement("strong"); t.textContent = soon.m.title;
+    let link = null;
+    if (soon.m.link) { link = document.createElement("a"); link.className = "btn small primary"; link.href = soon.m.link; link.target = "_blank"; link.rel = "noopener"; link.style.textDecoration = "none"; link.textContent = "Entrar agora"; }
+    showAlert(`Começa ${relTime(soon.t - now)} (${soon.m.start}): `, link);
+    a.firstChild.appendChild(t); a.dataset.id = id;
+  }
+  setInterval(() => { renderUpcoming(); checkAlerts(); }, 30000);
+
+  renderAll();
+  initStore();
+})();
+</script>
+
+</body>
+</html>
