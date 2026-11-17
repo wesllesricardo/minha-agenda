@@ -8,6 +8,7 @@ Agenda pessoal no padrão visual da E3 Company: calendário do mês, reuniões p
 
 - Marca reuniões com horário, categoria, link da chamada, local e anotações.
 - Guarda anotações livres em cada dia.
+- Marca reuniões como concluídas: elas ficam riscadas e saem da lista de próximas e dos avisos.
 - Mostra as próximas reuniões e avisa na tela 15 minutos antes, enquanto a página está aberta.
 - Exporta reuniões em `.ics`, com alarmes de 1 hora e de 15 minutos antes, para o calendário do celular ou do Outlook.
 - Envia uma reunião para o Google Agenda com um clique.

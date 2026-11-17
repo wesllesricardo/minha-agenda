@@ -119,6 +119,12 @@ header.top::after { content: ""; position: absolute; left: 0; right: 0; bottom: 
 .meet .mnotes { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; }
 .meet .acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
 .meet.past { opacity: 0.65; }
+.meet.done { opacity: 0.6; border-left-color: var(--muted); }
+.meet.done .title { text-decoration: line-through; text-decoration-color: var(--muted); }
+.donebadge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--on-action); background: var(--action); border-radius: 50px; padding: 1px 8px; }
+.btn.okbtn { border-color: var(--action); color: var(--action); }
+.btn.okbtn:hover { background: var(--action); color: var(--on-action); }
+.chip.done { opacity: 0.5; text-decoration: line-through; }
 .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tc); }
 
 form.mform { display: none; flex-direction: column; gap: 10px; border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
@@ -318,7 +324,7 @@ textarea { resize: vertical; min-height: 64px; }
       const n = document.createElement("div"); n.className = "n";
       n.innerHTML = `<span>${d.getDate()}</span>${info.notes.trim() ? '<i class="noteDot" title="Tem anotações"></i>' : ""}`;
       b.appendChild(n);
-      ms.slice(0, 2).forEach((m) => { const c = document.createElement("div"); c.className = "chip"; c.style.setProperty("--tc", tagColor(m.tag)); c.textContent = `${m.start} ${m.title}`; b.appendChild(c); });
+      ms.slice(0, 2).forEach((m) => { const c = document.createElement("div"); c.className = "chip" + (m.done ? " done" : ""); c.style.setProperty("--tc", tagColor(m.tag)); c.textContent = `${m.start} ${m.title}`; b.appendChild(c); });
       if (ms.length > 2) { const mo = document.createElement("div"); mo.className = "more"; mo.textContent = `+${ms.length - 2}`; b.appendChild(mo); }
       if (ms.length) { const dots = document.createElement("div"); dots.className = "dots"; ms.slice(0, 4).forEach((m) => { const i2 = document.createElement("i"); i2.style.setProperty("--tc", tagColor(m.tag)); dots.appendChild(i2); }); b.appendChild(dots); }
       b.addEventListener("click", () => selectDay(k));
@@ -336,7 +342,7 @@ textarea { resize: vertical; min-height: 64px; }
   }
   function allUpcoming() {
     const now = Date.now(), out = [];
-    Object.keys(days).forEach((k) => getDay(k).meetings.forEach((m) => { const t = meetDate(k, m.start).getTime(); if (t >= now - 5 * 60000) out.push({ k, m, t }); }));
+    Object.keys(days).forEach((k) => getDay(k).meetings.forEach((m) => { const t = meetDate(k, m.start).getTime(); if (!m.done && t >= now - 5 * 60000) out.push({ k, m, t }); }));
     return out.sort((a, b) => a.t - b.t);
   }
   function renderUpcoming() {
@@ -367,9 +373,10 @@ textarea { resize: vertical; min-height: 64px; }
     ms.forEach((m) => {
       const el = document.createElement("article");
       const past = meetDate(selected, m.end || m.start).getTime() < Date.now();
-      el.className = "meet" + (past ? " past" : ""); el.style.setProperty("--tc", tagColor(m.tag));
-      el.innerHTML = `<div class="row1"><span class="time"></span><span class="tag"></span></div><div class="title"></div><div class="meta"></div><div class="mnotes"></div>
+      el.className = "meet" + (m.done ? " done" : past ? " past" : ""); el.style.setProperty("--tc", tagColor(m.tag));
+      el.innerHTML = `<div class="row1"><span class="time"></span><span style="display:flex;gap:8px;align-items:center">${m.done ? '<span class="donebadge">✓ Concluída</span>' : ""}<span class="tag"></span></span></div><div class="title"></div><div class="meta"></div><div class="mnotes"></div>
         <div class="acts">
+          <button class="btn small okbtn" data-a="done" type="button" aria-pressed="${m.done ? "true" : "false"}">${m.done ? "Reabrir" : "✓ Concluída"}</button>
           <button class="btn small" data-a="edit" type="button">Editar</button>
           <button class="btn small" data-a="ics" type="button">Lembrete .ics</button>
           <a class="btn small" data-a="gcal" target="_blank" rel="noopener" style="text-decoration:none">Enviar ao Google</a>
@@ -384,6 +391,7 @@ textarea { resize: vertical; min-height: 64px; }
       if (!m.place && !m.link) meta.remove();
       const mn = el.querySelector(".mnotes"); if (m.notes) mn.textContent = m.notes; else mn.remove();
       el.querySelector('[data-a="gcal"]').href = gcalUrl(selected, m);
+      el.querySelector('[data-a="done"]').addEventListener("click", () => toggleDone(m.id));
       el.querySelector('[data-a="edit"]').addEventListener("click", () => openForm(m));
       el.querySelector('[data-a="ics"]').addEventListener("click", () => saveIcs([{ k: selected, m }], `reuniao-${selected}.ics`));
       const del = el.querySelector('[data-a="del"]');
@@ -415,6 +423,11 @@ textarea { resize: vertical; min-height: 64px; }
     $("mform").classList.add("on"); $("fTitle").focus();
   }
   function closeForm() { $("mform").classList.remove("on"); editingId = null; }
+  function toggleDone(id) {
+    const info = getDay(selected);
+    days[selected] = { ...info, meetings: info.meetings.map((x) => (x.id === id ? { ...x, done: !x.done } : x)) };
+    persist(selected); renderAll();
+  }
   function removeMeeting(id) {
     const info = getDay(selected);
     days[selected] = { ...info, meetings: info.meetings.filter((x) => x.id !== id) };
@@ -430,6 +443,8 @@ textarea { resize: vertical; min-height: 64px; }
       tag: $("fTag").value, link: $("fLink").value.trim(), place: $("fPlace").value.trim(), notes: $("fNotes").value.trim(),
     };
     if (!m.title || !m.start) return;
+    const prev = editingId ? getDay(selected).meetings.find((x) => x.id === editingId) : null;
+    if (prev && prev.done) m.done = true;
     if (m.end && m.end <= m.start) { $("fEnd").setCustomValidity("O fim precisa ser depois do início"); $("fEnd").reportValidity(); return; }
     $("fEnd").setCustomValidity("");
     const info = getDay(selected);
