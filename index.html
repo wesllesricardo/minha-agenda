@@ -125,6 +125,20 @@ header.top::after { content: ""; position: absolute; left: 0; right: 0; bottom: 
 .btn.okbtn { border-color: var(--action); color: var(--action); }
 .btn.okbtn:hover { background: var(--action); color: var(--on-action); }
 .chip.done { opacity: 0.5; text-decoration: line-through; }
+.repeat { display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--line); border-radius: 12px; padding: 10px; }
+.dowpick { border: 0; padding: 0; margin: 0; min-width: 0; }
+.dowpick legend { font-size: 12px; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.dowlist { display: flex; gap: 6px; flex-wrap: wrap; }
+.dowlist label { flex-direction: row; align-items: center; gap: 0; }
+.dowlist input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.dowlist span { display: inline-block; min-width: 44px; text-align: center; padding: 5px 10px; border-radius: 50px; border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.dowlist input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-action); }
+.dowlist input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rprev { font-size: 13px; color: var(--accent); font-weight: 600; min-height: 1em; }
+.rprev:empty { display: none; }
+label.check { flex-direction: row; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); }
+label.check input { width: auto; margin-top: 3px; accent-color: var(--accent); }
+.fixbadge { font-size: 11px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 50px; padding: 0 8px; }
 .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tc); }
 
 form.mform { display: none; flex-direction: column; gap: 10px; border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
@@ -205,6 +219,23 @@ textarea { resize: vertical; min-height: 64px; }
           <label>Link da chamada<input id="fLink" type="url" placeholder="https://meet.google.com/…"></label>
           <label>Local / com quem<input id="fPlace" maxlength="140" placeholder="Sala 3, João e Maria"></label>
         </div>
+        <div id="repeatBox" class="repeat">
+          <div class="frow">
+            <label>Repetir
+              <select id="fRepeat">
+                <option value="none">Não repete</option>
+                <option value="weekly">Toda semana</option>
+                <option value="biweekly">A cada 2 semanas</option>
+                <option value="weekdays">Todo dia útil (seg a sex)</option>
+                <option value="monthly">Todo mês, no mesmo dia</option>
+              </select>
+            </label>
+            <label id="untilWrap" hidden>Repetir até<input id="fUntil" type="date"></label>
+          </div>
+          <fieldset id="dowWrap" class="dowpick" hidden><legend>Nos dias</legend><div id="dowList" class="dowlist"></div></fieldset>
+          <div id="repeatPreview" class="rprev" aria-live="polite"></div>
+        </div>
+        <label id="seriesWrap" class="check" hidden><input type="checkbox" id="fApplySeries"> Aplicar título, horário, categoria, link e local nesta e nas próximas reuniões desta série</label>
         <label>Anotações da reunião<textarea id="fNotes" placeholder="Pauta, decisões, próximos passos…"></textarea></label>
         <div class="frow" style="justify-content:flex-end">
           <button class="btn ghost" type="button" id="cancelBtn">Cancelar</button>
@@ -261,22 +292,35 @@ textarea { resize: vertical; min-height: 64px; }
   const lsLoad = () => { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch { return {}; } };
   const lsSave = () => { try { localStorage.setItem(LS, JSON.stringify(days)); } catch {} };
 
-  const chains = {};
+  // Uma fila única de gravações: muitas reuniões de uma vez (séries) não estouram o limite de escritas simultâneas.
+  let chain = Promise.resolve();
+  const pendingDocs = {};   // dia -> versão local ainda não confirmada (protege contra snapshots antigos)
+  let pendingCount = 0;
   function persist(k) {
     if (mode === "local") { lsSave(); return Promise.resolve(); }
     if (mode !== "db") return Promise.resolve();
     const snapshot = JSON.parse(JSON.stringify(getDay(k)));
     const empty = !snapshot.meetings.length && !snapshot.notes.trim();
+    pendingDocs[k] = snapshot; pendingCount++;
+    if (pendingCount > 3) setStatus(`Salvando… (${pendingCount})`, "warn");
     const run = () => {
       const ref = col.doc("d-" + k);
-      return (empty ? ref.delete() : ref.set({ date: k, ...snapshot })).catch((e) => {
+      return (empty ? ref.delete() : ref.set({ date: k, ...snapshot })).then(() => {
+        if (pendingDocs[k] === snapshot) delete pendingDocs[k];
+      }, (e) => {
+        if (pendingDocs[k] === snapshot) delete pendingDocs[k];
         setStatus(e && e.code === "quota_exceeded" ? "Espaço cheio: apague dias antigos" : "Não foi possível salvar agora", "warn");
         throw e;
+      }).finally(() => {
+        pendingCount--;
+        if (pendingCount > 3) setStatus(`Salvando… (${pendingCount})`, "warn");
+        else if (pendingCount === 0 && !$("status").textContent.startsWith("Não") && !$("status").textContent.startsWith("Espaço")) setStatus("Salvo na sua conta", "ok");
       });
     };
-    chains[k] = (chains[k] || Promise.resolve()).catch(() => {}).then(run);
-    return chains[k];
+    chain = chain.catch(() => {}).then(run);
+    return chain;
   }
+  const persistMany = (keys) => { if (mode === "local") { lsSave(); return Promise.resolve(); } return Promise.all(keys.map((k) => persist(k).catch(() => {}))); };
 
   function setStatus(text, cls) { const s = $("status"); s.textContent = text; s.className = "status " + (cls || ""); }
 
@@ -297,6 +341,7 @@ textarea { resize: vertical; min-height: 64px; }
     col.onSnapshot((snap) => {
       const next = {};
       snap.docs.forEach((d) => { const v = d.data(); if (v && v.date) next[v.date] = { meetings: Array.isArray(v.meetings) ? v.meetings : [], notes: v.notes || "" }; });
+      Object.keys(pendingDocs).forEach((k) => { const p = pendingDocs[k]; if (!p.meetings.length && !p.notes.trim()) delete next[k]; else next[k] = p; });
       const typingKey = document.activeElement === $("dayNotes") ? selected : null;
       if (typingKey && days[typingKey]) next[typingKey] = { ...(next[typingKey] || { meetings: [] }), notes: days[typingKey].notes };
       days = next;
@@ -324,7 +369,7 @@ textarea { resize: vertical; min-height: 64px; }
       const n = document.createElement("div"); n.className = "n";
       n.innerHTML = `<span>${d.getDate()}</span>${info.notes.trim() ? '<i class="noteDot" title="Tem anotações"></i>' : ""}`;
       b.appendChild(n);
-      ms.slice(0, 2).forEach((m) => { const c = document.createElement("div"); c.className = "chip" + (m.done ? " done" : ""); c.style.setProperty("--tc", tagColor(m.tag)); c.textContent = `${m.start} ${m.title}`; b.appendChild(c); });
+      ms.slice(0, 2).forEach((m) => { const c = document.createElement("div"); c.className = "chip" + (m.done ? " done" : ""); c.style.setProperty("--tc", tagColor(m.tag)); c.textContent = `${m.seriesId ? "↻ " : ""}${m.start} ${m.title}`; b.appendChild(c); });
       if (ms.length > 2) { const mo = document.createElement("div"); mo.className = "more"; mo.textContent = `+${ms.length - 2}`; b.appendChild(mo); }
       if (ms.length) { const dots = document.createElement("div"); dots.className = "dots"; ms.slice(0, 4).forEach((m) => { const i2 = document.createElement("i"); i2.style.setProperty("--tc", tagColor(m.tag)); dots.appendChild(i2); }); b.appendChild(dots); }
       b.addEventListener("click", () => selectDay(k));
@@ -374,7 +419,7 @@ textarea { resize: vertical; min-height: 64px; }
       const el = document.createElement("article");
       const past = meetDate(selected, m.end || m.start).getTime() < Date.now();
       el.className = "meet" + (m.done ? " done" : past ? " past" : ""); el.style.setProperty("--tc", tagColor(m.tag));
-      el.innerHTML = `<div class="row1"><span class="time"></span><span style="display:flex;gap:8px;align-items:center">${m.done ? '<span class="donebadge">✓ Concluída</span>' : ""}<span class="tag"></span></span></div><div class="title"></div><div class="meta"></div><div class="mnotes"></div>
+      el.innerHTML = `<div class="row1"><span class="time"></span><span style="display:flex;gap:8px;align-items:center">${m.seriesId ? '<span class="fixbadge" title="Reunião repetida">↻ Fixa</span>' : ""}${m.done ? '<span class="donebadge">✓ Concluída</span>' : ""}<span class="tag"></span></span></div><div class="title"></div><div class="meta"></div><div class="mnotes"></div>
         <div class="acts">
           <button class="btn small okbtn" data-a="done" type="button" aria-pressed="${m.done ? "true" : "false"}">${m.done ? "Reabrir" : "✓ Concluída"}</button>
           <button class="btn small" data-a="edit" type="button">Editar</button>
@@ -396,6 +441,15 @@ textarea { resize: vertical; min-height: 64px; }
       el.querySelector('[data-a="ics"]').addEventListener("click", () => saveIcs([{ k: selected, m }], `reuniao-${selected}.ics`));
       const del = el.querySelector('[data-a="del"]');
       del.addEventListener("click", () => {
+        if (m.seriesId) {
+          const acts = del.parentElement;
+          const mk = (label, cls, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn small " + cls; b.textContent = label; b.addEventListener("click", fn); acts.appendChild(b); return b; };
+          del.remove();
+          mk("Excluir só esta", "danger", () => removeMeeting(m.id)).focus();
+          mk("Excluir esta e as próximas", "danger", () => removeSeriesFrom(m.seriesId, selected));
+          mk("Cancelar", "ghost", () => renderDay());
+          return;
+        }
         if (del.dataset.confirm) { removeMeeting(m.id); return; }
         del.dataset.confirm = "1"; del.textContent = "Confirmar exclusão";
         setTimeout(() => { if (del.isConnected) { delete del.dataset.confirm; del.textContent = "Excluir"; } }, 4000);
@@ -415,12 +469,81 @@ textarea { resize: vertical; min-height: 64px; }
   }
 
   // ---------- reuniões ----------
+  // ---------- repetição ----------
+  const MAXREP = 150;
+  const newId = () => "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const shortDate = (k) => { const d = parseKey(k); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1); };
+  function seriesKeys(startK, rule, dows, untilK) {
+    const start = parseKey(startK), until = parseKey(untilK || startK), out = [];
+    if (until < start) return out;
+    if (rule === "monthly") {
+      const day = start.getDate();
+      for (let i = 0; out.length < MAXREP; i++) {
+        const d = new Date(start.getFullYear(), start.getMonth() + i, day);
+        if (d > until) break;
+        if (d.getDate() === day) out.push(keyOf(d));   // meses sem esse dia (ex.: 31) ficam de fora
+      }
+      return out;
+    }
+    const weekStart = addDays(start, -start.getDay());
+    for (let d = new Date(start); d <= until && out.length < MAXREP; d = addDays(d, 1)) {
+      const dow = d.getDay();
+      if (rule === "weekdays") { if (dow >= 1 && dow <= 5) out.push(keyOf(d)); continue; }
+      if (!dows.includes(dow)) continue;
+      if (rule === "biweekly" && Math.floor(Math.round((d - weekStart) / 86400000) / 7) % 2) continue;
+      out.push(keyOf(d));
+    }
+    return out;
+  }
+  DOW.forEach((name, i) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" value="${i}" id="dow${i}"><span>${name}</span>`;
+    $("dowList").appendChild(l);
+  });
+  const selectedDows = () => [...document.querySelectorAll("#dowList input:checked")].map((i) => +i.value);
+  function updateRepeatUI() {
+    const r = $("fRepeat").value, on = r !== "none";
+    $("untilWrap").hidden = !on;
+    $("dowWrap").hidden = !(r === "weekly" || r === "biweekly");
+    const p = $("repeatPreview");
+    if (!on) { p.textContent = ""; return; }
+    const ks = seriesKeys(selected, r, selectedDows(), $("fUntil").value);
+    p.textContent = ks.length
+      ? `Vai criar ${ks.length} ${ks.length === 1 ? "reunião" : "reuniões"}, de ${shortDate(ks[0])} a ${shortDate(ks[ks.length - 1])}.` + (ks.length >= MAXREP ? ` Limite de ${MAXREP} por vez.` : "")
+      : "Nenhuma data nesse intervalo. Confira os dias e a data final.";
+  }
+  ["fRepeat", "fUntil"].forEach((id) => $(id).addEventListener("input", updateRepeatUI));
+  $("dowList").addEventListener("change", updateRepeatUI);
+
   function openForm(m) {
     editingId = m ? m.id : null;
     $("fTitle").value = m?.title || ""; $("fStart").value = m?.start || "09:00"; $("fEnd").value = m?.end || "";
     $("fTag").value = m?.tag || "work"; $("fLink").value = m?.link || ""; $("fPlace").value = m?.place || ""; $("fNotes").value = m?.notes || "";
     $("saveBtn").textContent = m ? "Salvar alterações" : "Salvar reunião";
+    $("repeatBox").hidden = !!m;
+    $("seriesWrap").hidden = !(m && m.seriesId);
+    $("fApplySeries").checked = false;
+    if (!m) {
+      $("fRepeat").value = "none";
+      const until = parseKey(selected); until.setMonth(until.getMonth() + 3);
+      $("fUntil").value = keyOf(until); $("fUntil").min = selected;
+      const wd = parseKey(selected).getDay();
+      document.querySelectorAll("#dowList input").forEach((i) => { i.checked = +i.value === wd; });
+      updateRepeatUI();
+    }
     $("mform").classList.add("on"); $("fTitle").focus();
+  }
+  function removeSeriesFrom(seriesId, fromK) {
+    const changed = [];
+    Object.keys(days).forEach((k) => {
+      if (k < fromK) return;
+      const info = getDay(k);
+      const kept = info.meetings.filter((x) => x.seriesId !== seriesId);
+      if (kept.length !== info.meetings.length) { days[k] = { ...info, meetings: kept }; changed.push(k); }
+    });
+    persistMany(changed); renderAll();
+    showAlert(`${changed.length} ${changed.length === 1 ? "reunião excluída" : "reuniões excluídas"} desta série, a partir de ${shortDate(fromK)}.`);
   }
   function closeForm() { $("mform").classList.remove("on"); editingId = null; }
   function toggleDone(id) {
@@ -437,20 +560,59 @@ textarea { resize: vertical; min-height: 64px; }
   $("cancelBtn").addEventListener("click", closeForm);
   $("mform").addEventListener("submit", (e) => {
     e.preventDefault();
-    const m = {
-      id: editingId || "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    const fields = {
       title: $("fTitle").value.trim(), start: $("fStart").value, end: $("fEnd").value,
-      tag: $("fTag").value, link: $("fLink").value.trim(), place: $("fPlace").value.trim(), notes: $("fNotes").value.trim(),
+      tag: $("fTag").value, link: $("fLink").value.trim(), place: $("fPlace").value.trim(),
     };
-    if (!m.title || !m.start) return;
-    const prev = editingId ? getDay(selected).meetings.find((x) => x.id === editingId) : null;
-    if (prev && prev.done) m.done = true;
-    if (m.end && m.end <= m.start) { $("fEnd").setCustomValidity("O fim precisa ser depois do início"); $("fEnd").reportValidity(); return; }
+    const notes = $("fNotes").value.trim();
+    if (!fields.title || !fields.start) return;
+    if (fields.end && fields.end <= fields.start) { $("fEnd").setCustomValidity("O fim precisa ser depois do início"); $("fEnd").reportValidity(); return; }
     $("fEnd").setCustomValidity("");
-    const info = getDay(selected);
-    const meetings = editingId ? info.meetings.map((x) => (x.id === editingId ? m : x)) : [...info.meetings, m];
-    days[selected] = { ...info, meetings };
-    persist(selected); closeForm(); renderAll();
+
+    if (editingId) {
+      const prev = getDay(selected).meetings.find((x) => x.id === editingId);
+      if (!prev) { closeForm(); renderAll(); return; }
+      if (prev.seriesId && $("fApplySeries").checked) {
+        const changed = [];
+        Object.keys(days).forEach((k) => {
+          if (k < selected) return;
+          const info = getDay(k); let hit = false;
+          const meetings = info.meetings.map((x) => {
+            if (x.seriesId !== prev.seriesId) return x;
+            hit = true;
+            return x.id === editingId ? { ...x, ...fields, notes } : { ...x, ...fields };
+          });
+          if (hit) { days[k] = { ...info, meetings }; changed.push(k); }
+        });
+        persistMany(changed); closeForm(); renderAll();
+        showAlert(`${changed.length} ${changed.length === 1 ? "reunião atualizada" : "reuniões atualizadas"} nesta série.`);
+        return;
+      }
+      const info = getDay(selected);
+      days[selected] = { ...info, meetings: info.meetings.map((x) => (x.id === editingId ? { ...x, ...fields, notes } : x)) };
+      persist(selected); closeForm(); renderAll();
+      return;
+    }
+
+    const rule = $("fRepeat").value;
+    if (rule === "none") {
+      const info = getDay(selected);
+      days[selected] = { ...info, meetings: [...info.meetings, { id: newId(), ...fields, notes }] };
+      persist(selected); closeForm(); renderAll();
+      return;
+    }
+    if ((rule === "weekly" || rule === "biweekly") && !selectedDows().length) {
+      $("repeatPreview").textContent = "Escolha pelo menos um dia da semana."; return;
+    }
+    const keys = seriesKeys(selected, rule, selectedDows(), $("fUntil").value);
+    if (!keys.length) { $("repeatPreview").textContent = "Nenhuma data nesse intervalo. Confira os dias e a data final."; return; }
+    const seriesId = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    keys.forEach((k, i) => {
+      const info = getDay(k);
+      days[k] = { ...info, meetings: [...info.meetings, { id: newId() + i, ...fields, notes: k === keys[0] ? notes : "", seriesId }] };
+    });
+    persistMany(keys); closeForm(); renderAll();
+    showAlert(`${keys.length} reuniões “${fields.title}” criadas, de ${shortDate(keys[0])} a ${shortDate(keys[keys.length - 1])}.`);
   });
   $("fEnd").addEventListener("input", () => $("fEnd").setCustomValidity(""));
 
